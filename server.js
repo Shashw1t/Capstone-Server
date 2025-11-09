@@ -8,15 +8,11 @@ const { v4: uuidv4 } = require('uuid');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(cors({
-  origin: [
-    'http://localhost:5174',
-    'https://capstone-ivory-two.vercel.app',
-    'https://capstone.shashw1t.in'
-  ]
-}));
-app.use(express.json());
+// CORS policy: permissive for now — allow requests from any origin.
+// WARNING: This allows all origins and is unsafe for production. Remove/lock down before production use.
+console.warn('CORS policy: permissive - allowing all origins (not safe for production)');
+app.use(cors());
+app.use(express.json({ limit: '1mb' }));
 
 // Create temp directory for code files
 const tempDir = path.join(__dirname, 'temp');
@@ -24,7 +20,7 @@ if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir);
 }
 
-// Comprehensive test cases for all problems
+// Full test cases object for problems 1..45
 const testCases = {
   '1': { name: 'Two Sum', cases: [
     { input: { nums: [2, 7, 11, 15], target: 9 }, expected: [0, 1] },
@@ -95,8 +91,8 @@ const testCases = {
     { input: { lists: [[]] }, expected: [] }
   ]},
   '14': { name: 'Valid Sudoku', cases: [
-    { input: { board: [['5', '3', '.', '.', '7', '.', '.', '.', '.'], ['6', '.', '.', '1', '9', '5', '.', '.', '.'], ['.', '9', '8', '.', '.', '.', '.', '6', '.'], ['8', '.', '.', '.', '6', '.', '.', '.', '3'], ['4', '.', '.', '8', '.', '3', '.', '.', '1'], ['7', '.', '.', '.', '2', '.', '.', '.', '6'], ['.', '6', '.', '.', '.', '.', '2', '8', '.'], ['.', '.', '.', '4', '1', '9', '.', '.', '5'], ['.', '.', '.', '.', '8', '.', '.', '7', '9']] }, expected: true },
-    { input: { board: [['8', '3', '.', '.', '7', '.', '.', '.', '.'], ['6', '.', '.', '1', '9', '5', '.', '.', '.'], ['.', '9', '8', '.', '.', '.', '.', '6', '.'], ['8', '.', '.', '.', '6', '.', '.', '.', '3'], ['4', '.', '.', '8', '.', '3', '.', '.', '1'], ['7', '.', '.', '.', '2', '.', '.', '.', '6'], ['.', '6', '.', '.', '.', '.', '2', '8', '.'], ['.', '.', '.', '4', '1', '9', '.', '.', '5'], ['.', '.', '.', '.', '8', '.', '.', '7', '9']] }, expected: false }
+    { input: { board: [['5', '3', '.', '.', '7', '.', '.', '.', '.'], ['6', '.', '.', '1', '9', '5', '.', '.', '.' ], ['.', '9', '8', '.', '.', '.', '.', '6', '.'], ['8', '.', '.', '.', '6', '.', '.', '.', '3'], ['4', '.', '.', '8', '.', '3', '.', '.', '1'], ['7', '.', '.', '.', '2', '.', '.', '.', '6'], ['.', '6', '.', '.', '.', '.', '2', '8', '.'], ['.', '.', '.', '4', '1', '9', '.', '.', '5'], ['.', '.', '.', '.', '8', '.', '.', '7', '9']] }, expected: true },
+    { input: { board: [['8', '3', '.', '.', '7', '.', '.', '.', '.'], ['6', '.', '.', '1', '9', '5', '.', '.', '.' ], ['.', '9', '8', '.', '.', '.', '.', '6', '.'], ['8', '.', '.', '.', '6', '.', '.', '.', '3'], ['4', '.', '.', '8', '.', '3', '.', '.', '1'], ['7', '.', '.', '.', '2', '.', '.', '.', '6'], ['.', '6', '.', '.', '.', '.', '2', '8', '.'], ['.', '.', '.', '4', '1', '9', '.', '.', '5'], ['.', '.', '.', '.', '8', '.', '.', '7', '9']] }, expected: false }
   ]},
   '15': { name: 'Climbing Stairs', cases: [
     { input: { n: 2 }, expected: 2 },
@@ -124,8 +120,8 @@ const testCases = {
     { input: { s: 'catsandog', wordDict: ['cats', 'dog', 'sand', 'and', 'cat'] }, expected: false }
   ]},
   '20': { name: 'Number of Islands', cases: [
-    { input: { grid: [['1', '1', '1', '1', '0'], ['1', '1', '0', '1', '0'], ['1', '1', '0', '0', '0'], ['0', '0', '0', '0', '0']] }, expected: 1 },
-    { input: { grid: [['1', '1', '0', '0', '0'], ['1', '1', '0', '0', '0'], ['0', '0', '1', '0', '0'], ['0', '0', '0', '1', '1']] }, expected: 3 }
+    { input: { grid: [['1', '1', '1', '1', '0'], ['1', '1', '0', '1', '0'], ['1', '1', '0', '0', '0'], ['0', '0','0', '0', '0']] }, expected: 1 },
+    { input: { grid: [['1', '1', '0', '0', '0'], ['1', '1', '0', '0', '0'], ['0', '0', '1', '0', '0'], ['0', '0','0', '1', '1']] }, expected: 3 }
   ]},
   '21': { name: 'Course Schedule', cases: [
     { input: { numCourses: 2, prerequisites: [[1, 0]] }, expected: true },
@@ -234,7 +230,17 @@ const testCases = {
   ]}
 };
 
-// Language configurations
+// Helper for platform-aware cpp executable path
+function getCppExePath(filename) {
+  // On Windows keep .exe, on Unix remove extension and run the binary file
+  if (process.platform === 'win32') {
+    return filename.replace(/\.cpp$/, '.exe');
+  } else {
+    // produce path without .cpp (g++ will create an executable at that path)
+    return filename.replace(/\.cpp$/, '');
+  }
+}
+
 const languageConfig = {
   javascript: {
     extension: '.js',
@@ -244,6 +250,7 @@ const languageConfig = {
   python: {
     extension: '.py',
     compile: null,
+    // run with explicit interpreter
     run: (filename) => `python "${filename}"`
   },
   java: {
@@ -251,43 +258,77 @@ const languageConfig = {
     compile: (filename) => `javac "${filename}"`,
     run: (filename) => {
       const className = path.basename(filename, '.java');
+      // run from the directory where class file is produced
       return `java -cp "${path.dirname(filename)}" ${className}`;
     },
     extractClassName: (code) => {
-      // Extract public class name from Java code
       const match = code.match(/public\s+class\s+(\w+)/);
       return match ? match[1] : 'Solution';
     }
   },
   cpp: {
     extension: '.cpp',
-    compile: (filename) => `g++ "${filename}" -o "${filename.replace('.cpp', '.exe')}"`,
-    run: (filename) => `"${filename.replace('.cpp', '.exe')}"`
+    compile: (filename) => {
+      const exePath = getCppExePath(filename);
+      return `g++ "${filename}" -o "${exePath}"`;
+    },
+    run: (filename) => {
+      const exePath = getCppExePath(filename);
+      // On unix exePath will be absolute path (no .exe); exec can run absolute path.
+      return `"${exePath}"`;
+    }
   }
 };
 
-// Get test case inputs endpoint
+// Keep both endpoints for compatibility
 app.get('/api/test-cases/:problemId', (req, res) => {
   const { problemId } = req.params;
   const testCase = testCases[problemId];
-  
+
   if (!testCase) {
     return res.status(404).json({ error: 'Problem not found' });
   }
-  
+
   // Return only the inputs, not the expected outputs
   const inputs = testCase.cases.map(c => c.input);
-  
+
   res.json({
     success: true,
     inputs: inputs
   });
 });
 
+app.get('/api/testcases/:problemId', (req, res) => {
+  const { problemId } = req.params;
+  const problemTestCases = testCases[problemId];
+
+  if (!problemTestCases) {
+    return res.status(404).json({
+      success: false,
+      error: 'Problem not found'
+    });
+  }
+
+  const sampleCases = problemTestCases.cases.slice(0, 2).map((testCase, index) => ({
+    testCase: index + 1,
+    input: testCase.input,
+    expected: testCase.expected,
+    isSample: true
+  }));
+
+  res.json({
+    success: true,
+    problemName: problemTestCases.name,
+    totalTestCases: problemTestCases.cases.length,
+    sampleTestCases: sampleCases,
+    hiddenTestCases: problemTestCases.cases.length - sampleCases.length
+  });
+});
+
 // Execute code endpoint
 app.post('/api/execute', async (req, res) => {
   const { code, language, input = '' } = req.body;
-  
+
   if (!code || !language) {
     return res.status(400).json({ error: 'Code and language are required' });
   }
@@ -299,12 +340,10 @@ app.post('/api/execute', async (req, res) => {
   const config = languageConfig[language];
   let filename;
   let submissionDir = tempDir;
-  
-  // For Java, use the class name as filename to avoid compilation errors
+
   if (language === 'java' && config.extractClassName) {
     const className = config.extractClassName(code);
     const fileId = uuidv4();
-    // Create unique directory for this submission to avoid conflicts
     submissionDir = path.join(tempDir, fileId);
     if (!fs.existsSync(submissionDir)) {
       fs.mkdirSync(submissionDir, { recursive: true });
@@ -314,17 +353,17 @@ app.post('/api/execute', async (req, res) => {
     const fileId = uuidv4();
     filename = path.join(tempDir, fileId + config.extension);
   }
-  
+
   try {
     // Write code to file
     fs.writeFileSync(filename, code);
-    
+
     const startTime = Date.now();
-    
+
     // Compile if needed
     if (config.compile) {
       const compileCommand = config.compile(filename);
-      
+
       await new Promise((resolve, reject) => {
         exec(compileCommand, { timeout: 10000 }, (error, stdout, stderr) => {
           if (error) {
@@ -335,16 +374,16 @@ app.post('/api/execute', async (req, res) => {
         });
       });
     }
-    
+
     // Run the code
     const runCommand = config.run(filename);
-    
+
     exec(runCommand, { timeout: 5000 }, (error, stdout, stderr) => {
       const executionTime = Date.now() - startTime;
-      
+
       // Clean up files
       cleanup(filename, language);
-      
+
       if (error) {
         if (error.signal === 'SIGTERM') {
           return res.json({
@@ -354,7 +393,7 @@ app.post('/api/execute', async (req, res) => {
             executionTime
           });
         }
-        
+
         return res.json({
           success: false,
           output: stdout || '',
@@ -362,7 +401,7 @@ app.post('/api/execute', async (req, res) => {
           executionTime
         });
       }
-      
+
       res.json({
         success: true,
         output: stdout,
@@ -370,7 +409,7 @@ app.post('/api/execute', async (req, res) => {
         executionTime
       });
     });
-    
+
   } catch (error) {
     // Clean up on error
     try {
@@ -380,7 +419,7 @@ app.post('/api/execute', async (req, res) => {
     } catch (cleanupError) {
       console.error('Cleanup error:', cleanupError);
     }
-    
+
     res.json({
       success: false,
       output: '',
@@ -390,181 +429,91 @@ app.post('/api/execute', async (req, res) => {
   }
 });
 
-// Validate solution endpoint
-app.post('/api/validate', async (req, res) => {
-  const { code, language, problemId } = req.body;
-  
-  if (!code || !language || !problemId) {
-    return res.status(400).json({ 
-      success: false, 
-      error: 'Code, language, and problemId are required' 
-    });
-  }
-
-  if (!languageConfig[language]) {
-    return res.status(400).json({ 
-      success: false, 
-      error: 'Unsupported language' 
-    });
-  }
-
-  const problemTestCases = testCases[problemId];
-  if (!problemTestCases) {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid problem ID'
-    });
-  }
-
-  const config = languageConfig[language];
-  let filename;
-  let submissionDir = tempDir;
-  
-  // For Java, use the class name as filename to avoid compilation errors
-  if (language === 'java' && config.extractClassName) {
-    const className = config.extractClassName(code);
-    const fileId = uuidv4();
-    // Create unique directory for this submission to avoid conflicts
-    submissionDir = path.join(tempDir, fileId);
-    if (!fs.existsSync(submissionDir)) {
-      fs.mkdirSync(submissionDir, { recursive: true });
-    }
-    filename = path.join(submissionDir, className + config.extension);
-  } else {
-    const fileId = uuidv4();
-    filename = path.join(tempDir, fileId + config.extension);
-  }
-  
-  try {
-    // Write code to file
-    fs.writeFileSync(filename, code);
-    
-    const startTime = Date.now();
-    
-    // Compile if needed
-    if (config.compile) {
-      const compileCommand = config.compile(filename);
-      
-      await new Promise((resolve, reject) => {
-        exec(compileCommand, { timeout: 10000 }, (error, stdout, stderr) => {
-          if (error) {
-            reject(new Error(`Compilation failed: ${stderr || error.message}`));
-          } else {
-            resolve();
-          }
-        });
-      });
-    }
-    
-    // Run the code
-    const runCommand = config.run(filename);
-    
-    exec(runCommand, { timeout: 10000 }, (error, stdout, stderr) => {
-      const executionTime = Date.now() - startTime;
-      
-      // Clean up files
-      cleanup(filename, language);
-      
-      if (error) {
-        return res.json({
-          success: false,
-          output: stderr || error.message,
-          testResults: [],
-          allTestsPassed: false,
-          totalTests: 0,
-          passedTests: 0,
-          executionTime
-        });
-      }
-      
-      // Parse test outputs and validate
-      const outputs = stdout.trim().split('\n');
-      const results = parseTestResults(outputs, problemTestCases.cases);
-      
-      res.json({
-        success: true,
-        output: stdout,
-        testResults: results,
-        allTestsPassed: results.every(r => r.passed),
-        totalTests: results.length,
-        passedTests: results.filter(r => r.passed).length,
-        executionTime
-      });
-    });
-    
-  } catch (error) {
-    cleanup(filename, language);
-    
-    res.json({
-      success: false,
-      output: '',
-      error: error.message,
-      testResults: [],
-      allTestsPassed: false,
-      totalTests: 0,
-      passedTests: 0,
-      executionTime: 0
-    });
-  }
-});
-
+//
+// Improved parsing helper: tolerant of Python-style outputs (single quotes, True/False, None)
+// and simple numeric/boolean outputs. Best-effort normalization before JSON.parse.
+//
 function parseTestResults(outputs, expectedResults) {
   const results = [];
-  
-  outputs.forEach((output, index) => {
-    if (output && output.startsWith('Test ')) {
-      const parts = output.split(': ');
-      if (parts.length < 2) {
-        // Invalid format, skip this output
-        return;
-      }
-      
-      const testOutput = parts[1];
-      const expected = expectedResults[index]?.expected;
-      
-      let actual;
-      try {
-        actual = JSON.parse(testOutput);
-      } catch (parseError) {
-        // Handle non-JSON outputs (like numbers or strings)
-        if (testOutput) {
-          actual = testOutput.trim();
-          if (!isNaN(actual)) {
-            actual = Number(actual);
-          }
-        } else {
-          actual = null;
-        }
-      }
-      
-      const passed = JSON.stringify(actual) === JSON.stringify(expected);
-      
-      results.push({
-        testCase: index + 1,
-        expected: expected,
-        actual: actual,
-        passed: passed
-      });
+
+  const normalizeCandidate = (s) => {
+    if (!s) return s;
+    let t = s.trim();
+
+    // Replace Python booleans and None
+    t = t.replace(/\bTrue\b/g, 'true').replace(/\bFalse\b/g, 'false').replace(/\bNone\b/g, 'null');
+
+    // If it looks like Python list/dict and contains single quotes, convert to double quotes
+    const looksLikePyStructure = (/^[\[\{].*[\]\}]$/s).test(t);
+    if (looksLikePyStructure && t.includes("'")) {
+      // Replace single quotes with double quotes (best-effort)
+      t = t.replace(/'/g, '"');
     }
+
+    return t;
+  };
+
+  const tryParse = (s) => {
+    if (s === null || s === undefined) return null;
+    const candidate = s.trim();
+    try {
+      return JSON.parse(candidate);
+    } catch (_) {
+      const normalized = normalizeCandidate(candidate);
+      try {
+        return JSON.parse(normalized);
+      } catch (_) {
+        // Fallback to primitive parsing
+        if (candidate === 'true') return true;
+        if (candidate === 'false') return false;
+        if (candidate === '') return '';
+        if (!isNaN(candidate) && candidate !== '') return Number(candidate);
+        return candidate;
+      }
+    }
+  };
+
+  outputs.forEach((output, index) => {
+    if (!output) return;
+
+    // Only consider lines that start with "Test "
+    if (!output.startsWith('Test ')) return;
+
+    const parts = output.split(': ');
+    if (parts.length < 2) return;
+
+    const testOutput = parts.slice(1).join(': ');
+    const expected = expectedResults[index]?.expected;
+
+    const actual = tryParse(testOutput);
+
+    const passed = JSON.stringify(actual) === JSON.stringify(expected);
+
+    results.push({
+      testCase: index + 1,
+      expected,
+      actual,
+      passed
+    });
   });
-  
+
   return results;
 }
 
 function cleanup(filename, language) {
   try {
     const fileDir = path.dirname(filename);
-    
+
     if (fs.existsSync(filename)) {
       fs.unlinkSync(filename);
     }
-    
+
     if (language === 'java') {
       const classFile = filename.replace('.java', '.class');
       if (fs.existsSync(classFile)) {
         fs.unlinkSync(classFile);
       }
-      
+
       // Clean up the submission directory if it exists and is different from tempDir
       if (fileDir !== tempDir && fs.existsSync(fileDir)) {
         const files = fs.readdirSync(fileDir);
@@ -579,11 +528,15 @@ function cleanup(filename, language) {
         fs.rmdirSync(fileDir);
       }
     }
-    
+
     if (language === 'cpp') {
-      const exeFile = filename.replace('.cpp', '.exe');
-      if (fs.existsSync(exeFile)) {
-        fs.unlinkSync(exeFile);
+      const exeFileWin = filename.replace('.cpp', '.exe');
+      const exeFileUnix = filename.replace('.cpp', '');
+      if (fs.existsSync(exeFileWin)) {
+        fs.unlinkSync(exeFileWin);
+      }
+      if (fs.existsSync(exeFileUnix)) {
+        try { fs.unlinkSync(exeFileUnix); } catch (_) { /* ignore */ }
       }
     }
   } catch (cleanupError) {
@@ -591,27 +544,184 @@ function cleanup(filename, language) {
   }
 }
 
-// Submit solution with full test case validation
+// Validate solution endpoint
+app.post('/api/validate', async (req, res) => {
+  const { code, language, problemId } = req.body;
+
+  // Debug log incoming request body to help trace invalid problemId issues
+  console.log('[/api/validate] Incoming request body:', { problemId, language, codeLength: code ? code.length : 0 });
+
+  // Normalize problemId: accept numeric strings, numbers, or strings containing digits (e.g. '/problem/12')
+  let normalizedProblemId = problemId;
+  if (typeof normalizedProblemId === 'string') {
+    const m = normalizedProblemId.match(/(\d+)/);
+    if (m) {
+      normalizedProblemId = m[1];
+      console.log(`[ /api/validate ] Normalized problemId from "${problemId}" to "${normalizedProblemId}"`);
+    }
+  }
+
+  if (!code || !language || !problemId) {
+    return res.status(400).json({
+      success: false,
+      error: 'Code, language, and problemId are required'
+    });
+  }
+
+  if (!languageConfig[language]) {
+    return res.status(400).json({
+      success: false,
+      error: 'Unsupported language'
+    });
+  }
+
+  const problemTestCases = testCases[normalizedProblemId];
+  if (!problemTestCases) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid problem ID'
+    });
+  }
+
+  const config = languageConfig[language];
+  let filename;
+  let submissionDir = tempDir;
+
+  if (language === 'java' && config.extractClassName) {
+    const className = config.extractClassName(code);
+    const fileId = uuidv4();
+    submissionDir = path.join(tempDir, fileId);
+    if (!fs.existsSync(submissionDir)) {
+      fs.mkdirSync(submissionDir, { recursive: true });
+    }
+    filename = path.join(submissionDir, className + config.extension);
+  } else {
+    const fileId = uuidv4();
+    filename = path.join(tempDir, fileId + config.extension);
+  }
+
+  try {
+    fs.writeFileSync(filename, code);
+
+    const startTime = Date.now();
+
+    if (config.compile) {
+      const compileStart = Date.now();
+      const compileCommand = config.compile(filename);
+
+      try {
+        await new Promise((resolve, reject) => {
+          exec(compileCommand, { timeout: 10000 }, (error, stdout, stderr) => {
+            if (error) {
+              reject(new Error(`Compilation Error: ${stderr || error.message}`));
+            } else {
+              resolve();
+            }
+          });
+        });
+      } catch (compileError) {
+        cleanup(filename, language);
+        return res.json({
+          success: false,
+          error: compileError.message,
+          testResults: [],
+          allTestsPassed: false,
+          totalTests: problemTestCases.cases.length,
+          passedTests: 0,
+          executionTime: 0
+        });
+      }
+    }
+
+    const runCommand = config.run(filename);
+
+    exec(runCommand, { timeout: 15000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+      const executionTime = Date.now() - startTime;
+
+      // Log raw outputs to help debugging
+      console.log('--- Raw stdout ---');
+      console.log(stdout);
+      console.log('--- Raw stderr ---');
+      console.log(stderr);
+
+      // Clean up files
+      cleanup(filename, language);
+
+      if (error) {
+        return res.json({
+          success: false,
+          output: stderr || error.message,
+          testResults: [],
+          allTestsPassed: false,
+          totalTests: problemTestCases.cases.length,
+          passedTests: 0,
+          executionTime
+        });
+      }
+
+      // Parse test outputs and validate
+      const outputs = stdout.trim().split('\n');
+      const results = parseTestResults(outputs, problemTestCases.cases);
+
+      res.json({
+        success: true,
+        output: stdout,
+        testResults: results,
+        allTestsPassed: results.length > 0 && results.every(r => r.passed),
+        totalTests: results.length,
+        passedTests: results.filter(r => r.passed).length,
+        executionTime
+      });
+    });
+
+  } catch (error) {
+    cleanup(filename, language);
+
+    res.json({
+      success: false,
+      output: '',
+      error: error.message,
+      testResults: [],
+      allTestsPassed: false,
+      totalTests: 0,
+      passedTests: 0,
+      executionTime: 0
+    });
+  }
+});
+
+// Submit solution with full test case validation (same logic as previous submit)
 app.post('/api/submit', async (req, res) => {
   const { code, language, problemId } = req.body;
-  
+  console.log('[/api/submit] Incoming request body:', { problemId, language, codeLength: code ? code.length : 0 });
+
+  // Normalize problemId like in /api/validate
+  let normalizedProblemId = problemId;
+  if (typeof normalizedProblemId === 'string') {
+    const m = normalizedProblemId.match(/(\d+)/);
+    if (m) {
+      normalizedProblemId = m[1];
+      console.log(`[ /api/submit ] Normalized problemId from "${problemId}" to "${normalizedProblemId}"`);
+    }
+  }
+
   if (!code || !language || !problemId) {
-    return res.status(400).json({ 
-      success: false, 
+    return res.status(400).json({
+      success: false,
       error: 'Code, language, and problemId are required',
       verdict: 'ERROR'
     });
   }
 
   if (!languageConfig[language]) {
-    return res.status(400).json({ 
-      success: false, 
+    return res.status(400).json({
+      success: false,
       error: 'Unsupported language',
       verdict: 'ERROR'
     });
   }
 
-  const problemTestCases = testCases[problemId];
+  const problemTestCases = testCases[normalizedProblemId];
   if (!problemTestCases) {
     return res.status(400).json({
       success: false,
@@ -623,12 +733,10 @@ app.post('/api/submit', async (req, res) => {
   const config = languageConfig[language];
   let filename;
   let submissionDir = tempDir;
-  
-  // For Java, use the class name as filename to avoid compilation errors
+
   if (language === 'java' && config.extractClassName) {
     const className = config.extractClassName(code);
     const fileId = uuidv4();
-    // Create unique directory for this submission to avoid conflicts
     submissionDir = path.join(tempDir, fileId);
     if (!fs.existsSync(submissionDir)) {
       fs.mkdirSync(submissionDir, { recursive: true });
@@ -638,19 +746,17 @@ app.post('/api/submit', async (req, res) => {
     const fileId = uuidv4();
     filename = path.join(tempDir, fileId + config.extension);
   }
-  
+
   try {
-    // Write code to file
     fs.writeFileSync(filename, code);
-    
+
     const startTime = Date.now();
     let compilationTime = 0;
-    
-    // Compile if needed
+
     if (config.compile) {
       const compileStart = Date.now();
       const compileCommand = config.compile(filename);
-      
+
       try {
         await new Promise((resolve, reject) => {
           exec(compileCommand, { timeout: 10000 }, (error, stdout, stderr) => {
@@ -676,22 +782,27 @@ app.post('/api/submit', async (req, res) => {
         });
       }
     }
-    
-    // Run the code
+
     const runCommand = config.run(filename);
-    
-    exec(runCommand, { timeout: 15000 }, (error, stdout, stderr) => {
+
+    exec(runCommand, { timeout: 15000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
       const totalExecutionTime = Date.now() - startTime - compilationTime;
-      
+
+      // Log raw outputs
+      console.log('--- Raw stdout (submit) ---');
+      console.log(stdout);
+      console.log('--- Raw stderr (submit) ---');
+      console.log(stderr);
+
       // Clean up files
       cleanup(filename, language);
-      
+
       if (error) {
         let verdict = 'RUNTIME ERROR';
         if (error.signal === 'SIGTERM' || error.killed) {
           verdict = 'TIME LIMIT EXCEEDED';
         }
-        
+
         return res.json({
           success: false,
           verdict: verdict,
@@ -703,54 +814,54 @@ app.post('/api/submit', async (req, res) => {
           compilationTime
         });
       }
-      
-      // Parse test outputs and validate
+
       try {
         const outputs = stdout.trim().split('\n').filter(line => line.trim());
         const testResults = [];
         let passedCount = 0;
-        
+
         outputs.forEach((output, index) => {
           if (index < problemTestCases.cases.length) {
             const testCase = problemTestCases.cases[index];
-            
-            // Extract actual output from "Test N: <value>" format
+
             let actualOutput = output;
             if (output.includes(': ')) {
               actualOutput = output.split(': ').slice(1).join(': ');
             }
-            
-            // Parse the output
+
             let actual;
             try {
               actual = JSON.parse(actualOutput);
-            } catch {
-              // Handle non-JSON outputs
-              actualOutput = actualOutput.trim();
-              if (actualOutput === 'true') actual = true;
-              else if (actualOutput === 'false') actual = false;
-              else if (!isNaN(actualOutput) && actualOutput !== '') actual = Number(actualOutput);
-              else actual = actualOutput;
+            } catch (_) {
+              // fallback to tolerant parsing
+              const normalized = actualOutput.replace(/\bTrue\b/g, 'true').replace(/\bFalse\b/g, 'false').replace(/\bNone\b/g, 'null').replace(/'/g, '"');
+              try {
+                actual = JSON.parse(normalized);
+              } catch (__) {
+                const trimmed = actualOutput.trim();
+                if (trimmed === 'true') actual = true;
+                else if (trimmed === 'false') actual = false;
+                else if (!isNaN(trimmed) && trimmed !== '') actual = Number(trimmed);
+                else actual = trimmed;
+              }
             }
-            
-            // Compare with expected
+
             const expected = testCase.expected;
             const passed = JSON.stringify(actual) === JSON.stringify(expected);
-            
+
             if (passed) passedCount++;
-            
+
             testResults.push({
               testCase: index + 1,
               input: testCase.input,
-              expected: expected,
-              actual: actual,
-              passed: passed,
+              expected,
+              actual,
+              passed,
               status: passed ? 'PASSED' : 'FAILED'
             });
           }
         });
-        
-        // Determine final verdict
+
         let verdict;
         if (passedCount === 0) {
           verdict = 'WRONG ANSWER';
@@ -759,11 +870,11 @@ app.post('/api/submit', async (req, res) => {
         } else {
           verdict = 'PARTIAL';
         }
-        
+
         res.json({
           success: true,
-          verdict: verdict,
-          testResults: testResults,
+          verdict,
+          testResults,
           passedTests: passedCount,
           totalTests: problemTestCases.cases.length,
           executionTime: totalExecutionTime,
@@ -771,7 +882,7 @@ app.post('/api/submit', async (req, res) => {
           output: stdout,
           score: Math.round((passedCount / problemTestCases.cases.length) * 100)
         });
-        
+
       } catch (parseError) {
         res.json({
           success: false,
@@ -786,10 +897,10 @@ app.post('/api/submit', async (req, res) => {
         });
       }
     });
-    
+
   } catch (error) {
     cleanup(filename, language);
-    
+
     res.json({
       success: false,
       verdict: 'ERROR',
@@ -801,35 +912,6 @@ app.post('/api/submit', async (req, res) => {
       compilationTime: 0
     });
   }
-});
-
-// Get test cases for a problem
-app.get('/api/testcases/:problemId', (req, res) => {
-  const { problemId } = req.params;
-  const problemTestCases = testCases[problemId];
-  
-  if (!problemTestCases) {
-    return res.status(404).json({
-      success: false,
-      error: 'Problem not found'
-    });
-  }
-  
-  // Return only sample test cases (first 2-3), hide the rest
-  const sampleCases = problemTestCases.cases.slice(0, 2).map((testCase, index) => ({
-    testCase: index + 1,
-    input: testCase.input,
-    expected: testCase.expected,
-    isSample: true
-  }));
-  
-  res.json({
-    success: true,
-    problemName: problemTestCases.name,
-    totalTestCases: problemTestCases.cases.length,
-    sampleTestCases: sampleCases,
-    hiddenTestCases: problemTestCases.cases.length - sampleCases.length
-  });
 });
 
 // Health check endpoint
@@ -850,7 +932,7 @@ app.get('/api/languages', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Code execution server running on http://localhost:${PORT}`);
-  console.log(`📋 Supported languages: ${Object.keys(languageConfig).join(', ')}`);
-  console.log(`📝 Test cases loaded for ${Object.keys(testCases).length} problems`);
+  console.log(`Code execution server running on http://localhost:${PORT}`);
+  console.log(`Supported languages: ${Object.keys(languageConfig).join(', ')}`);
+  console.log(`Test cases loaded for ${Object.keys(testCases).length} problems`);
 });
