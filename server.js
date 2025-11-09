@@ -10,7 +10,11 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5174', 'https://your-vercel-url.vercel.app']
+  origin: [
+    'http://localhost:5174',
+    'https://capstone-ivory-two.vercel.app',
+    'https://capstone.shashw1t.in'
+  ]
 }));
 app.use(express.json());
 
